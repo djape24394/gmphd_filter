@@ -1,3 +1,4 @@
+import tkinter
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy.linalg as lin
@@ -6,85 +7,123 @@ import ospa
 import pickle
 
 
-def pdf_multivariate_gauss(x, mu, cov):
-    '''
-    Caculate the multivariate normal density (pdf)
-
-    Keyword arguments:
-        x = numpy array of a "d x 1" sample vector
-        mu = numpy array of a "d x 1" mean vector
-        cov = "numpy array of a d x d" covariance matrix
-    '''
-
-    part1 = 1 / (((2 * np.pi) ** (mu.size / 2)) * (lin.det(cov) ** 0.5))
-    part2 = (-1 / 2) * ((x - mu) @ lin.inv(cov) @ (x - mu))
-    return float(part1 * np.exp(part2))
-
-
-def pdf_multivariate_gauss2(x, mu, detC, invC):
+def multivariate_gaussian(x: np.ndarray, m: np.ndarray, P: np.ndarray):
     """
-
-    :param x: numpy array of a "d x 1" sample vector
-    :param mu: numpy array of a "d x 1" mean vector
-    :param detC: "numpy array of a d x d" determinant of covariance matrix
-    :param invC: "numpy array of a d x d" inversion of covariance matrix
-    :return:
+        Multivatiate Gaussian Distribution
     """
-    part1 = 1 / (((2 * np.pi) ** (mu.size / 2)) * (detC ** 0.5))
-    part2 = (-1 / 2) * ((x - mu) @ invC @ (x - mu))
-    return float(part1 * np.exp(part2))
+    first_part = 1 / (((2 * np.pi) ** (x.size / 2.0)) * (lin.det(P) ** 0.5))
+    second_part = -0.5 * (x - m) @ lin.inv(P) @ (x - m)
+    return first_part * np.exp(second_part)
+
+
+def multivariate_gaussian_with_det_and_inv(x: np.ndarray, m: np.ndarray, detP, invP: np.ndarray):
+    """
+        Multivariate Gaussian Distribution with provided determinant and inverse of Gaussian mixture
+    """
+    first_part = 1 / (((2 * np.pi) ** (x.size / 2.0)) * (detP ** 0.5))
+    second_part = -0.5 * (x - m) @ invP @ (x - m)
+    return first_part * np.exp(second_part)
+
+
+def clutter_intensity_function(z, lc, surveillance_region):
+    '''
+    Clutter intensity function, with uniform distribution through the surveillance region, pg. 8
+    in "Bayesian Multiple Target Filtering Using Random Finite Sets" by Vo, Vo, Clark.
+    :param z:
+    :param lc: average number of false detections per time step
+    :param surveillance_region: np.ndarray of shape (number_dimensions, 2) giving range(min and max) for each dimension
+    '''
+    if surveillance_region[0][0] <= z[0] <= surveillance_region[0][1] and surveillance_region[1][0] <= z[1] <= \
+            surveillance_region[1][1]:
+        # example in two dimensions: lc/((xmax - xmin)*(ymax-ymin))
+        return lc / ((surveillance_region[0][1] - surveillance_region[0][0]) * (
+                surveillance_region[1][1] - surveillance_region[1][0]))
+    else:
+        return 0
 
 
 class GaussianMixture:
     def __init__(self, w, m, P):
         """
-        The Gaussian mixture
-        :param w: list of weights (list of scalar values)
-        :param m: list of means (list of elements type ndarray)
-        :param P: list of covariance matrices(list of elements type ndarray)
+        The Gaussian mixture class
+        inputs:
+        - w: list of scalar weights
+        - m: list of np.ndarray means
+        - m: list of np.ndarray covariance matrices
+
+        Note that constructor creates detP and invP variables which can be used instead of P list for covariance matrix
+        determinant and inverse. These lists could be initialized with assign_determinant_and_inverse function
         """
         self.w = w
         self.m = m
         self.P = P
+        self.detP = None
+        self.invP = None
 
-    def compute_density(self, x):
-        my_sum = 0
-        for i in range(len(self.w)):
-            my_sum += self.w[i] * pdf_multivariate_gauss(x, self.m[i], self.P[i])
-        return my_sum
+    def assign_determinant_and_inverse(self, detP, invP):
+        self.detP = detP
+        self.invP = invP
+
+    def mixture_value(self, x: np.ndarray):
+        sum = 0
+        if self.detP is None:
+            for i in range(len(self.w)):
+                sum += self.w[i] * multivariate_gaussian(x, self.m[i], self.P[i])
+        else:
+            for i in range(len(self.w)):
+                sum += self.w[i] * multivariate_gaussian_with_det_and_inv(x, self.m[i], self.detP[i], self.invP[i])
+        return sum
+
+    def mixture_component_value_at(self, x: np.ndarray, i: int):
+        if self.detP is None:
+            return self.w[i] * multivariate_gaussian(x, self.m[i], self.P[i])
+        else:
+            return self.w[i] * multivariate_gaussian_with_det_and_inv(x, self.m[i], self.detP[i], self.invP[i])
+
+    def mixture_component_values_list(self, x):
+        val = []
+        if self.detP is None:
+            for i in range(len(self.w)):
+                val.append(self.w[i] * multivariate_gaussian(x, self.m[i], self.P[i]))
+        else:
+            for i in range(len(self.w)):
+                val.append(self.w[i] * multivariate_gaussian_with_det_and_inv(x, self.m[i], self.detP[i], self.invP[i]))
+        return val
 
     def copy(self):
-        """
-        :return:Deep copy of object
-        """
         w = self.w.copy()
         m = []
         P = []
-        for mean in self.m:
-            m.append(mean.copy())
-        for cov in self.P:
-            P.append(cov.copy())
+        for m1 in self.m:
+            m.append(m1.copy())
+        for P1 in self.P:
+            P.append(P1.copy())
         return GaussianMixture(w, m, P)
 
 
-class GMPHD:
-    def __init__(self, model):
-        """
+class GmphdFilter:
+    """
         The Gaussian Mixture Probability Hypothesis Density filter implementation. It's based on
         "The Gaussian mixture probability hypothesis density filter" by Vo and Ma.
-        Note that x will be 1D ndarray.
+    """
+
+    def __init__(self, model, dtype=np.float64):
+        """
+        Note that state x will be np.ndarray. in our model, we assume linear transition and measurement in the
+        following form
             x[k] = Fx[k-1] + w[k-1]
-            y[k] = Hx[k] + v[k]
-        :param model: dictionary which contains the following elements(keys are strings):
+            z[k] = Hx[k] + v[k]
+        Inputs:
+        - model: dictionary which contains the following elements(keys are strings):
                F: state transition matrix
-               H:
-               Q: process noise covariance matrix(of variable w[k]). If it's scalar, you should pass scalar
-               R: measurement noise covariance matrix(of variable v[k]). If it's scalar, you should pass scalar
+               H: measurement matrix
+               Q: process noise covariance matrix(of variable w[k]).
+               R: measurement noise covariance matrix(of variable v[k]).
              p_d: probability of target detection
              p_s: probability of target survival
 
          Spawning model, see paper pg. 5. it's a gaussian mixture conditioned on state
-         F_spawn:  d_spawn: Q_spawn: w_spawn: lists with the same size, see pg. 5
+         F_spawn:  d_spawn: Q_spawn: w_spawn: lists of ndarray objects with the same length, see pg. 5
 
     clutt_int_fun: reference to clutter intensity function, gets only one argument, which is the current measure
 
@@ -92,224 +131,223 @@ class GMPHD:
 
         birth_GM: The Gaussian Mixture of the birth intensity
         """
+        # to do: dtype, copy, improve performance
+        self.p_s = model['p_s']
         self.F = model['F']
-        self.H = model['H']
         self.Q = model['Q']
-        self.R = model['R']
-
-        # Parameters for the spawning model: beta(x|ksi) = sum(w[i]*Normal(x,F_spawn[i]*ksi+d_spawn[i],Q_spawn[i]))
+        self.w_spawn = model['w_spawn']
         self.F_spawn = model['F_spawn']
         self.d_spawn = model['d_spawn']
         self.Q_spawn = model['Q_spawn']
-        self.w_spawn = model['w_spawn']
-
-        # birth Gaussian mixture
         self.birth_GM = model['birth_GM']
-
-        # probability of survival and detection
         self.p_d = model['p_d']
-        self.p_s = model['p_s']
-
-        # the reference to clutter intensity function
-        self.clutter_intensity = model['clutt_int_fun']
-
-        # pruning and merging parameters:
+        self.H = model['H']
+        self.R = model['R']
+        self.clutter_density_func = model['clutt_int_fun']
         self.T = model['T']
         self.U = model['U']
         self.Jmax = model['Jmax']
 
-        # intensity function of prediction and correction. Estimated state set X for current iteration
-        self.v_pred = None
-        self.v_corr = GaussianMixture([], [], [])
-        self.X = None
-
-    def prediction(self):
-        # prediction for birth targets
-        gm = self.birth_GM.copy()
-        w = gm.w
-        m = gm.m
-        P = gm.P
-
-        # prediction for spawning targets
-        for j, wspwn in enumerate(self.w_spawn):
-            for l, wcorr in enumerate(self.v_corr.w):
-                w.append(wspwn * wcorr)
-                m.append(self.F_spawn[j] @ self.v_corr.m[l] + self.d_spawn[j])
-                P.append(self.Q_spawn[j] + self.F_spawn[j] @ self.v_corr.P[l] @ self.F_spawn[j].T)
-
-        # prediction for existing targets
-        w.extend(np.array(self.v_corr.w) * self.p_s)
-        for mean in self.v_corr.m:
-            m.append(self.F @ mean)
-        for Pc in self.v_corr.P:
-            P.append(self.Q + self.F @ Pc @ self.F.T)
-
-        self.v_pred = GaussianMixture(w, m, P)
-
-    def correction(self, z_set):
-        eta = []
-        S = []
-        detS = []
-        invS = []
-        K = []
-        Pk = []
-        for mean in self.v_pred.m:
-            eta.append(self.H @ mean)
-        for P1 in self.v_pred.P:
-            s = self.R + self.H @ P1 @ self.H.T
-            S.append(s)
-            detS.append(lin.det(s))
-            invS.append(lin.inv(s))
-            K.append(P1 @ self.H.T @ invS[-1])
-            Pk.append(P1 - K[-1] @ self.H @ P1)
-        pm = self.v_pred.copy()
-        w = (np.array(pm.w) * (1 - self.p_d)).tolist()
-        m = pm.m
-        P = pm.P
-        for z in z_set:
-            w1 = []
-            for j, wpred in enumerate(self.v_pred.w):
-                w1.append(self.p_d * wpred * pdf_multivariate_gauss2(z, eta[j], detS[j], invS[j]))
-                m.append(self.v_pred.m[j] + K[j] @ (z - eta[j]))
-                P.append(Pk[j].copy())
-            w1 = np.array(w1)
-            c1 = self.clutter_intensity(z) + w1.sum()
-            w1 = w1 / c1
-            w.extend(w1)
-        self.v_corr = GaussianMixture(w, m, P)
-
-    def prune(self):
-        I = (np.array(self.v_corr.w) > self.T).nonzero()[0]
-        w = [self.v_corr.w[i] for i in I]
-        m = [self.v_corr.m[i] for i in I]
-        P = [self.v_corr.P[i] for i in I]
-        self.v_corr = GaussianMixture(w, m, P)
-
-    def merge(self):
+    def thinning_and_displacement(self, v: GaussianMixture, p, F: np.ndarray, Q: np.ndarray):
+        """
+        For the given Gaussian mixture v, perform thinning with probability P and displacement with N(x; F @ x_prev, Q)
+        """
         w = []
         m = []
         P = []
+        for weight in v.w:
+            w.append(weight * p)
+        for mean in v.m:
+            m.append(F @ mean)
+        for cov_matrix in v.P:
+            P.append(Q + F @ cov_matrix @ F.T)
+        return GaussianMixture(w, m, P)
+
+    def spawn_mixture(self, v):
+        """
+        Spawning targets in prediction step
+        """
+        w = []
+        m = []
+        P = []
+        for i, w_v in enumerate(v.w):
+            for j, w_spawn in enumerate(self.w_spawn):
+                w.append(w_v * w_spawn)
+                m.append(self.F_spawn[j] @ v.m[i] + self.d_spawn[j])
+                P.append(self.Q_spawn[j] + self.F_spawn[j] @ v.P[i] @ self.F_spawn[j].T)
+        return GaussianMixture(w, m, P)
+
+    def get_list_of_determinants(self, P_list):
+        detP = []
+        for P in P_list:
+            detP.append(lin.det(P))
+        return detP
+
+    def get_list_of_inverses(self, P_list):
         invP = []
-        for P1 in self.v_corr.P:
-            invP.append(lin.inv(P1))
-        I = np.array(self.v_corr.w).nonzero()[0].tolist()
+        for P in P_list:
+            invP.append(lin.inv(P))
+        return invP
+
+    def prediction(self, v):
+        """
+        Prediction step of the GMPHD filter
+        Inputs:
+        - v: Gaussian mixture of the previous step
+        """
+        # v_pred = v_s + v_spawn +  v_new_born
+        birth_copy = self.birth_GM.copy()
+        # targets that survived v_s:
+        v_s = self.thinning_and_displacement(v, self.p_s, self.F, self.Q)
+        # spawning targets
+        v_spawn = self.spawn_mixture(v)
+        # final phd of prediction
+        return GaussianMixture(v_s.w + v_spawn.w + birth_copy.w, v_s.m + v_spawn.m + birth_copy.m,
+                               v_s.P + v_spawn.P + birth_copy.P)
+
+    def correction(self, v: GaussianMixture, Z):
+        """
+        Correction step of the GMPHD filter
+        Inputs:
+        - v: Gaussian mixture obtained from the prediction step implemented in prediction function
+        - Z: Measurement set, containing list of observations
+        """
+        v_residual = self.thinning_and_displacement(v, self.p_d, self.H, self.R)
+        detP = self.get_list_of_determinants(v_residual.P)
+        invP = self.get_list_of_inverses(v_residual.P)
+        v_residual.assign_determinant_and_inverse(detP, invP)
+
+        K = []
+        P_kk = []
+        for i in range(len(v_residual.w)):
+            k = v.P[i] @ self.H.T @ invP[i]
+            K.append(k)
+            P_kk.append(v.P[i] - k @ self.H @ v.P[i])
+
+        v_copy = v.copy()
+        w = (np.array(v_copy.w) * (1 - self.p_d)).tolist()
+        m = v_copy.m
+        P = v_copy.P
+
+        for z in Z:
+            values = v_residual.mixture_component_values_list(z)
+            normalization_factor = np.sum(values) + self.clutter_density_func(z)
+            for i in range(len(v_residual.w)):
+                w.append(values[i] / normalization_factor)
+                m.append(v.m[i] + K[i] @ (z - v_residual.m[i]))
+                P.append(P_kk[i].copy())
+
+        return GaussianMixture(w, m, P)
+
+    def pruning(self, v: GaussianMixture):
+        I = (np.array(v.w) > self.T).nonzero()[0]
+        w = [v.w[i] for i in I]
+        m = [v.m[i] for i in I]
+        P = [v.P[i] for i in I]
+        v = GaussianMixture(w, m, P)
+        I = (np.array(v.w) > self.T).nonzero()[0].tolist()
+        invP = self.get_list_of_inverses(v.P)
+        vw = np.array(v.w)
+        vm = np.array(v.m)
+        w = []
+        m = []
+        P = []
         while len(I) > 0:
             j = I[0]
             for i in I:
-                if self.v_corr.w[i] > self.v_corr.w[j]:
+                if vw[i] > vw[j]:
                     j = i
             L = []
             for i in I:
-                if (self.v_corr.m[i] - self.v_corr.m[j]).T @ invP[i] @ (self.v_corr.m[i] - self.v_corr.m[j]) <= self.U:
+                if (vm[i] - vm[j]) @ invP[i] @ (vm[i] - vm[j]) <= self.U:
                     L.append(i)
-            # w_new = np.array(self.v_corr.w)[L].sum()
-            w_new = 0
+            w_new = np.sum(vw[L])
+            m_new = np.sum((vw[L] * vm[L].T).T, axis=0) / w_new
+            P_new = np.zeros((m_new.shape[0], m_new.shape[0]))
             for i in L:
-                w_new += self.v_corr.w[i]
-            m_new = np.zeros(self.v_corr.m[0].shape)
-            P_new = np.zeros(self.v_corr.P[0].shape)
-            for i in L:
-                m_new += self.v_corr.w[i] * self.v_corr.m[i]
-            m_new = m_new / w_new
-            for i in L:
-                P_new += self.v_corr.w[i] * (
-                        self.v_corr.P[i] + np.outer(m_new - self.v_corr.m[i], m_new - self.v_corr.m[i]))
-            P_new = P_new / w_new
+                P_new += vw[i] * (v.P[i] + np.outer(m_new - vm[i], m_new - vm[i]))
+            P_new /= w_new
             w.append(w_new)
             m.append(m_new)
             P.append(P_new)
             I = [i for i in I if i not in L]
+
         if len(w) > self.Jmax:
             L = np.array(w).argsort()[-self.Jmax:]
             w = [w[i] for i in L]
             m = [m[i] for i in L]
             P = [P[i] for i in L]
-        self.v_corr = GaussianMixture(w, m, P)
 
-    def state_extraction(self):
-        x = []
-        for i, wght in enumerate(self.v_corr.w):
-            if wght > 0.5:
-                for j in range(int(round(wght))):
-                    x.append(self.v_corr.m[i])
-        self.X = x
-        return x
+        return GaussianMixture(w, m, P)
 
-    def filter(self, z_set):
-        self.prediction()
-        self.correction(z_set)
-        self.prune()
-        self.merge()
-        x = self.state_extraction()
-        return x
+    def state_estimation(self, v: GaussianMixture):
+        X = []
+        for i in range(len(v.w)):
+            if v.w[i] >= 0.5:
+                for j in range(int(np.round(v.w[i]))):
+                    X.append(v.m[i])
+        return X
 
-    def run_filter(self, data):
-        X_collection = []
-        for z_set in data:
-            X_collection.append(self.filter(z_set))
-        return X_collection
-
-
-def plot_results():
-    pass
-
-
-def extract_position_collection(X_collection):
-    X_pos = []
-    for X_set in X_collection:
-        x = []
-        for state in X_set:
-            x.append(state[0:2])
-        X_pos.append(x)
-    return X_pos
+    def filter_data(self, Z):
+        """
+        Input:
+        -Z: list of lists of np.ndarray representing the observations for each time step
+        Output:
+        -X: list of lists of np.ndarray representing the estimations for each time step
+        """
+        X = []
+        v = GaussianMixture([], [], [])
+        for z in Z:
+            v = self.prediction(v)
+            v = self.correction(v, z)
+            v = self.pruning(v)
+            x = self.state_estimation(v)
+            X.append(x)
+        return X
 
 
-def clutter_intensity_function(pos, lc, surveillance_region):
-    '''
-    Clutter intensity function, with uniform distribution through the surveillance region, see pg. 8
-    :param pos:
-    :param lc:
-    :param surveillance_region:
-    '''
-    if surveillance_region[0] <= pos[0] <= surveillance_region[1] and surveillance_region[2] <= pos[1] <= \
-            surveillance_region[3]:
-        return lc / ((surveillance_region[1] - surveillance_region[0]) * (
-                surveillance_region[3] - surveillance_region[2]))
-    else:
-        return 0
-
-
-def generate_model():
+def process_model_for_example_1():
     # This is the model for the example in "Bayesian Multiple Target Filtering Using Random Finite Sets" by Vo, Vo, Clark
     # The implementation almost analog to Matlab code provided by Vo in http://ba-tuong.vo-au.com/codes.html
 
-    # surveillance region
-    xmin = -1000
-    xmax = 1000
-    ymin = -1000
-    ymax = 1000
-
-    # model - model of system
     model = {}
-    model['surveillance_region'] = np.array([xmin, xmax, ymin, ymax])
-    # Sampling time
-    delta = 1.
-    model['delta'] = delta
+
+    # Sampling time, time step duration
+    T_s = 1.
+    model['T_s'] = T_s
+
+    # number of scans, number of iterations in our simulation
     model['num_scans'] = 100
-    # F = [[I2, delta*I2], [02, I2]
+
+    # Surveillance region
+    x_min = -1000
+    x_max = 1000
+    y_min = -1000
+    y_max = 1000
+    model['surveillance_region'] = np.array([[x_min, x_max], [y_min, y_max]])
+
+    # TRANSITION MODEL
+    # Probability of survival
+    model['p_s'] = 0.99
+
+    # Transition matrix
+    I_2 = np.eye(2)
+    # F = [[I_2, T_s*I_2], [02, I_2]
     F = np.zeros((4, 4))
-    F[0:2, 0:2] = np.eye(2, 2)
-    F[0:2, 2:] = np.eye(2, 2) * delta
-    F[2:, 2:] = np.eye(2, 2)
+    F[0:2, 0:2] = I_2
+    F[0:2, 2:] = I_2 * T_s
+    F[2:, 2:] = I_2
     model['F'] = F
 
-    sv = 5.
+    # Process noise covariance matrix
     Q = np.zeros((4, 4))
-    Q[0:2, 0:2] = (delta ** 4) / 4 * np.eye(2, 2)
-    Q[0:2, 2:] = (delta ** 3) / 2 * np.eye(2, 2)
-    Q[2:, 0:2] = (delta ** 3) / 2 * np.eye(2, 2)
-    Q[2:, 2:] = (delta ** 2) * np.eye(2, 2)
-    Q = Q * (sv ** 2)
+    Q[0:2, 0:2] = (T_s ** 4) / 4 * I_2
+    Q[0:2, 2:] = (T_s ** 3) / 2 * I_2
+    Q[2:, 0:2] = (T_s ** 3) / 2 * I_2
+    Q[2:, 2:] = (T_s ** 2) * I_2
+    # standard deviation of the process noise
+    sigma_w = 5.
+    Q = Q * (sigma_w ** 2)
     model['Q'] = Q
 
     # Parameters for the spawning model: beta(x|ksi) = sum(w[i]*Normal(x,F_spawn[i]*ksi+d_spawn[i],Q_spawn[i]))
@@ -318,21 +356,24 @@ def generate_model():
     model['Q_spawn'] = []
     model['w_spawn'] = []
 
-    # probability of survival and detection
-    model['p_d'] = 0.98
-    model['p_s'] = 0.99
-
+    # Parameters of the new born targets Gaussian mixture
     w = [0.03] * 4
     m = [np.array([0., 0., 0., 0.]), np.array([400., -600., 0., 0.]), np.array([-800., -200., 0., 0.]),
          np.array([-200., 800., 0., 0.])]
-    Ppom = np.diag([100., 100., 100., 100.])
-    P = [Ppom.copy(), Ppom.copy(), Ppom.copy(), Ppom.copy()]
+    P_pom_ = np.diag([100., 100., 100., 100.])
+    P = [P_pom_.copy(), P_pom_.copy(), P_pom_.copy(), P_pom_.copy()]
     model['birth_GM'] = GaussianMixture(w, m, P)
 
+    # MEASUREMENT MODEL
+    # probability of detection
+    model['p_d'] = 0.98
+
+    # measurement matrix z = Hx + v = N(z; Hx, R)
     model['H'] = np.zeros((2, 4))
     model['H'][:, 0:2] = np.eye(2)
-    se = 10  # m
-    model['R'] = np.eye(2) * (se ** 2)
+    # measurement noise covariance matrix
+    sigma_v = 10  # m
+    model['R'] = I_2 * (sigma_v ** 2)
 
     # the reference to clutter intensity function
     model['lc'] = 50
@@ -346,59 +387,80 @@ def generate_model():
     return model
 
 
-def generate_model2():
-    # This is the model for the example in "The Gaussian mixture probability hypothesis density filter" by Vo and Ma.
+def process_model_for_example_2():
+    """
+    This is the model of the process for the example in "Bayesian Multiple Target Filtering Using Random Finite Sets" by
+    Vo, Vo, Clark. The model code is analog to Matlab code provided by
+    Vo in http://ba-tuong.vo-au.com/codes.html
 
-    # surveillance region
-    xmin = -1000
-    xmax = 1000
-    ymin = -1000
-    ymax = 1000
+    :returns
+    - model: dictionary containing the necessary parameters, read through code to understand it better
+    """
 
-    # model - model of system
     model = {}
-    model['surveillance_region'] = np.array([xmin, xmax, ymin, ymax])
-    # Sampling time
-    delta = 1.
-    model['delta'] = delta
+
+    # Sampling time, time step duration
+    T_s = 1.
+    model['T_s'] = T_s
+
+    # number of scans, number of iterations in our simulation
     model['num_scans'] = 100
-    # F = [[I2, delta*I2], [02, I2]
+
+    # Surveillance region
+    x_min = -1000
+    x_max = 1000
+    y_min = -1000
+    y_max = 1000
+    model['surveillance_region'] = np.array([[x_min, x_max], [y_min, y_max]])
+
+    # TRANSITION MODEL
+    # Probability of survival
+    model['p_s'] = 0.99
+
+    # Transition matrix
+    I_2 = np.eye(2)
+    # F = [[I_2, T_s*I_2], [02, I_2]
     F = np.zeros((4, 4))
-    F[0:2, 0:2] = np.eye(2, 2)
-    F[0:2, 2:] = np.eye(2, 2) * delta
-    F[2:, 2:] = np.eye(2, 2)
+    F[0:2, 0:2] = I_2
+    F[0:2, 2:] = I_2 * T_s
+    F[2:, 2:] = I_2
     model['F'] = F
 
-    sv = 5.
+    # Process noise covariance matrix
     Q = np.zeros((4, 4))
-    Q[0:2, 0:2] = (delta ** 4) / 4 * np.eye(2, 2)
-    Q[0:2, 2:] = (delta ** 3) / 2 * np.eye(2, 2)
-    Q[2:, 0:2] = (delta ** 3) / 2 * np.eye(2, 2)
-    Q[2:, 2:] = (delta ** 2) * np.eye(2, 2)
-    Q = Q * (sv ** 2)
+    Q[0:2, 0:2] = (T_s ** 4) / 4 * I_2
+    Q[0:2, 2:] = (T_s ** 3) / 2 * I_2
+    Q[2:, 0:2] = (T_s ** 3) / 2 * I_2
+    Q[2:, 2:] = (T_s ** 2) * I_2
+    # standard deviation of the process noise
+    sigma_w = 5.
+    Q = Q * (sigma_w ** 2)
     model['Q'] = Q
 
     # Parameters for the spawning model: beta(x|ksi) = sum(w[i]*Normal(x,F_spawn[i]*ksi+d_spawn[i],Q_spawn[i]))
-    model['F_spawn'] = [np.eye(4)]
-    model['d_spawn'] = [np.zeros(4)]
-    model['Q_spawn'] = [np.diag([100., 100, 400, 400])]
     model['w_spawn'] = [0.05]
+    model['F_spawn'] = [np.eye(4)]
+    model['d_spawn'] = [0]
+    Q_spawn = np.eye(4) * 100
+    Q_spawn[[2, 3], [2, 3]] = 400
+    model['Q_spawn'] = Q_spawn
 
-    # probability of survival and detection
-    model['p_d'] = 0.98
-    model['p_s'] = 0.99
-
-    # these are parameters for the example from GMPHD paper
+    # Parameters of the new born targets Gaussian mixture
     w = [0.1, 0.1]
     m = [np.array([250., 250., 0., 0.]), np.array([-250., -250., 0., 0.])]
     P = [np.diag([100., 100, 25, 25]), np.diag([100., 100, 25, 25])]
-
     model['birth_GM'] = GaussianMixture(w, m, P)
 
+    # MEASUREMENT MODEL
+    # probability of detection
+    model['p_d'] = 0.98
+
+    # measurement matrix z = Hx + v = N(z; Hx, R)
     model['H'] = np.zeros((2, 4))
     model['H'][:, 0:2] = np.eye(2)
-    se = 10  # m
-    model['R'] = np.eye(2) * (se ** 2)
+    # measurement noise covariance matrix
+    sigma_v = 10  # m
+    model['R'] = I_2 * (sigma_v ** 2)
 
     # the reference to clutter intensity function
     model['lc'] = 50
@@ -410,6 +472,20 @@ def generate_model2():
     model['Jmax'] = 100
 
     return model
+
+
+def plot_results():
+    pass
+
+
+def extract_positions_of_targets(X_collection):
+    X_pos = []
+    for X_set in X_collection:
+        x = []
+        for state in X_set:
+            x.append(state[0:2])
+        X_pos.append(x)
+    return X_pos
 
 
 def example1(num_of_scans=100):
@@ -463,9 +539,9 @@ def generate_trajectories(model, targets_birth_time, targets_death_time, targets
             target_state = model['F'] @ target_state
             if noise:
                 target_state += np.random.multivariate_normal(np.zeros(target_state.size), model['Q'])
-            if target_state[0] < model['surveillance_region'][0] or target_state[0] > model['surveillance_region'][1] or \
-                    target_state[1] < model['surveillance_region'][2] or target_state[1] > model['surveillance_region'][
-                3]:
+            if target_state[0] < model['surveillance_region'][0][0] or target_state[0] > \
+                    model['surveillance_region'][0][1] or target_state[1] < model['surveillance_region'][1][0] or \
+                    target_state[1] > model['surveillance_region'][1][1]:
                 targets_death_time[i] = k - 1
                 break
             trajectories[k].append(target_state)
@@ -487,9 +563,9 @@ def generate_trajectories(model, targets_birth_time, targets_death_time, targets
             target_state = model['F'] @ target_state
             if noise:
                 target_state += np.random.multivariate_normal(np.zeros(target_state.size), model['Q'])
-            if target_state[0] < model['surveillance_region'][0] or target_state[0] > model['surveillance_region'][1] or \
-                    target_state[1] < model['surveillance_region'][2] or target_state[1] > model['surveillance_region'][
-                3]:
+            if target_state[0] < model['surveillance_region'][0][0] or target_state[0] > \
+                    model['surveillance_region'][0][1] or target_state[1] < model['surveillance_region'][1][0] or \
+                    target_state[1] > model['surveillance_region'][1][1]:
                 targets_death_time[-1] = k - 1
                 break
             trajectories[k].append(target_state)
@@ -507,14 +583,14 @@ def generate_measurements(model, trajectories):
                 meas = model['H'] @ state + np.random.multivariate_normal(np.zeros(model['H'].shape[0]), model['R'])
                 m.append(meas)
         for i in range(np.random.poisson(model['lc'])):
-            x = (surveillanceRegion[1] - surveillanceRegion[0]) * np.random.rand() + surveillanceRegion[0]
-            y = (surveillanceRegion[3] - surveillanceRegion[2]) * np.random.rand() + surveillanceRegion[2]
+            x = (surveillanceRegion[0][1] - surveillanceRegion[0][0]) * np.random.rand() + surveillanceRegion[0][0]
+            y = (surveillanceRegion[1][1] - surveillanceRegion[1][0]) * np.random.rand() + surveillanceRegion[1][0]
             m.append(np.array([x, y]))
         data.append(m)
     return data
 
 
-def true_tracks_plots(targets_birth_time, targets_death_time, targets_tracks, delta):
+def true_trajectory_tracks_plots(targets_birth_time, targets_death_time, targets_tracks, delta):
     for_plot = {}
     for i, birth in enumerate(targets_birth_time):
         brojac = birth
@@ -530,7 +606,7 @@ def true_tracks_plots(targets_birth_time, targets_death_time, targets_tracks, de
     return for_plot
 
 
-def sets_collection_for_plot(X_collection, delta):
+def extract_axis_for_plot(X_collection, delta):
     time = []
     x = []
     y = []
@@ -544,108 +620,59 @@ def sets_collection_for_plot(X_collection, delta):
     return time, x, y
 
 
-def MC_run():
-    # parameters for OSPA metric
-    c = 100.
-    p = 1
-
-    model = generate_model()
-    targets_birth_time, targets_death_time, targets_start = example1(100)
-    trajectories, targets_tracks = generate_trajectories(model, targets_birth_time, targets_death_time, targets_start,
-                                                         noise=False)
-    truth_collection = extract_position_collection(trajectories)
-
-    osp_all_total = []
-    osp_loc_total = []
-    osp_card_total = []
-    tnum_total = []
-    for i in range(500):
-        a = time.time()
-        data = generate_measurements(model, trajectories)
-        gmphd = GMPHD(model)
-        X_collection = gmphd.run_filter(data)
-        X_pos = extract_position_collection(X_collection)
-        ospa_loc = []
-        ospa_card = []
-        ospa_all = []
-        tnum = []
-        for j, x_set in enumerate(X_pos):
-            oall, oloc, ocard = ospa.ospa_all(truth_collection[j], x_set, c, p)
-            ospa_all.append(oall)
-            ospa_loc.append(oloc)
-            ospa_card.append(ocard)
-            tnum.append(len(x_set))
-        osp_all_total.append(ospa_all)
-        osp_loc_total.append(ospa_loc)
-        osp_card_total.append(ospa_card)
-        tnum_total.append(tnum)
-        print('Iteration ' + str(i) + ', total time: ' + str(time.time() - a))
-
-    with open('MC2ospatnum500.pkl', 'wb') as output:
-        pickle.dump((osp_all_total, osp_loc_total, osp_card_total, tnum_total), output)
-
-    ospall = np.array(osp_all_total)
-    ospAllMean = ospall.mean(0)
-    osploc = np.array(osp_loc_total)
-    ospLocMean = osploc.mean(0)
-    ospcar = np.array(osp_card_total)
-    ospCarMean = ospcar.mean(0)
-    tnum = np.array(tnum_total)
-    tnumMean = tnum.mean(0)
-    tnumStd = tnum.std(0)
-
-    plt.figure()
-    plt.plot(ospAllMean)
-
-    plt.figure()
-    plt.plot(ospLocMean)
-
-    plt.figure()
-    plt.plot(ospCarMean)
-
-    plt.figure()
-    plt.plot(tnumMean)
-    plt.plot(tnumMean - tnumStd)
-    plt.plot(tnumMean + tnumStd)
-
-
 if __name__ == '__main__':
-    model = generate_model()
-    targets_birth_time, targets_death_time, targets_start = example1(100)
-    trajectories, targets_tracks = generate_trajectories(model, targets_birth_time, targets_death_time, targets_start,
-                                                         noise=False)
-    # model = generate_model2()
-    # targets_birth_time, targets_death_time, targets_start, targets_spw_time_brttgt_vel = example2(100)
+
+    # For example 1, uncomment the following code.
+    # =================================================Example 1========================================================
+    # model = process_model_for_example_1()
+    # targets_birth_time, targets_death_time, targets_start = example1(model['num_scans'])
     # trajectories, targets_tracks = generate_trajectories(model, targets_birth_time, targets_death_time, targets_start,
-    #                                                      targets_spw_time_brttgt_vel, noise=False)
+    #                                                      noise=False)
+    # ==================================================================================================================
+
+    # For example 2, uncomment the following code.
+    # =================================================Example 2========================================================
+    model = process_model_for_example_2()
+    targets_birth_time, targets_death_time, targets_start, targets_spw_time_brttgt_vel = example2(model['num_scans'])
+    trajectories, targets_tracks = generate_trajectories(model, targets_birth_time, targets_death_time, targets_start,
+                                                         targets_spw_time_brttgt_vel, noise=False)
+    # ==================================================================================================================
+
+    # Collections of observations for each time step
     data = generate_measurements(model, trajectories)
-    gmphd = GMPHD(model)
+
+    # Call of the gmphd filter on the created observations collections
+    gmphd = GmphdFilter(model)
     a = time.time()
-    X_collection = gmphd.run_filter(data)
+    X_collection = gmphd.filter_data(data)
     print('Filtration time: ' + str(time.time() - a) + ' sec')
 
-    # plot trajectories
-    tracks_plot = true_tracks_plots(targets_birth_time, targets_death_time, targets_tracks, model['delta'])
+    # Plotting the results of filtration saved in X_collection file
+    tracks_plot = true_trajectory_tracks_plots(targets_birth_time, targets_death_time, targets_tracks, model['T_s'])
     plt.figure()
     for key in tracks_plot:
         t, x, y = tracks_plot[key]
         plt.plot(x[0], y[0], 'o', c='k', mfc='none')
         plt.plot(x[-1], y[-1], 's', c='k', mfc='none')
         plt.plot(x, y)
-    plt.axis(model['surveillance_region'])
+    plt.axis(model['surveillance_region'].flatten())
     plt.gca().set_aspect('equal', adjustable='box')
     plt.xlabel('x')
     plt.ylabel('y')
+    # plt.title(r"Targets movement in surveilance region. Circle represents the starting point and"
+    #           r" square represents the end point.",loc='center', wrap=True)
 
     # plot measurements, true trajectories and estimations
-    meas_time, meas_x, meas_y = sets_collection_for_plot(data, model['delta'])
-    estim_time, estim_x, estim_y = sets_collection_for_plot(X_collection, model['delta'])
+    meas_time, meas_x, meas_y = extract_axis_for_plot(data, model['T_s'])
+    estim_time, estim_x, estim_y = extract_axis_for_plot(X_collection, model['T_s'])
     plt.figure()
     plt.plot(meas_time, meas_x, 'x', c='C0')
     for key in tracks_plot:
         t, x, y = tracks_plot[key]
         plt.plot(t, x, 'r')
     plt.plot(estim_time, estim_x, 'o', c='k', markersize=3)
+    plt.xlabel('time[$sec$]')
+    plt.ylabel('x')
 
     # plot measurements, true trajectories and estimations
     plt.figure()
@@ -654,8 +681,8 @@ if __name__ == '__main__':
         t, x, y = tracks_plot[key]
         plt.plot(t, y, 'r')
     plt.plot(estim_time, estim_y, 'o', c='k', markersize=3)
-
-    # MC_run()
+    plt.xlabel('time[$sec$]')
+    plt.ylabel('y')
 
     num_targets_truth = []
     num_targets_estimated = []
@@ -671,6 +698,7 @@ if __name__ == '__main__':
     plt.setp(stemlines, visible=False)  # visible=False)
     plt.setp(markerline, markersize=3.0)
     plt.step(num_targets_truth, 'r', label='actual number of targets')
-    plt.xlabel('time($sec$)')
+    plt.xlabel('time[$sec$]')
     plt.legend()
     plt.title('Estimated cardinality VS actual cardinality')
+    plt.show()
