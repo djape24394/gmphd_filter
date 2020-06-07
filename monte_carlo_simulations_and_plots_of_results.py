@@ -94,16 +94,19 @@ if __name__ == '__main__':
         plt.plot(ospAllMean)
         plt.xlabel('Time step')
         plt.ylabel('OSPA Dist')
+        plt.grid(True)
 
         plt.figure()
         plt.plot(ospLocMean)
         plt.xlabel('Time step')
         plt.ylabel('OSPA Loc')
+        plt.grid(True)
 
         plt.figure()
         plt.plot(ospCarMean)
         plt.xlabel('Time step')
         plt.ylabel('OSPA Card')
+        plt.grid(True)
 
         plt.figure()
         plt.plot(tnumMean)
@@ -111,5 +114,6 @@ if __name__ == '__main__':
         plt.plot(tnumMean + tnumStd)
         plt.xlabel('Time step')
         plt.ylabel('Avg. numb. of targets')
+        plt.grid(True)
         plt.show()
     # ===============================================================================

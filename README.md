@@ -8,17 +8,32 @@ The [gmphd.py](gmphd.py) contains two simulation examples.
 The first is actually replica of the example in "Bayesian Multiple 
 Target Filtering Using Random Finite Sets" by Vo, Vo, Clark used for performance evaulation of GMPHD filter. Targets lifes
  are based on Matlab code provided by Vo in http://ba-tuong.vo-au.com/codes.html and example doesn't contain target spawning.
- 
-![img](images/Figure_1.png?raw=True)![img](images/Figure_4.png?raw=True)
 
-![img](images/Figure_2.png?raw=True)![img](images/Figure_3.png?raw=True)
+ <table>
+  <tr>
+    <td valign="top"><img src="images/Figure_1.png"></td>
+    <td valign="top"><img src="images/Figure_4.png"></td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="images/Figure_2.png"></td>
+    <td valign="top"><img src="images/Figure_3.png"></td>
+  </tr>
+ </table>
+ 
 ### Example 2
 The second example is based on simulation example in "The Gaussian mixture probability hypothesis density filter" by Vo and Ma. Also, 
 this example demonstrates the spawning situation.
 
-![img](images/2Figure_4.png?raw=True)![img](images/2Figure_1.png?raw=True)
-
-![img](images/2Figure_2.png?raw=True)![img](images/2Figure_3.png?raw=True)
+ <table>
+  <tr>
+    <td valign="top"><img src="images/2Figure_1.png"></td>
+    <td valign="top"><img src="images/2Figure_4.png"></td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="images/2Figure_2.png"></td>
+    <td valign="top"><img src="images/2Figure_3.png"></td>
+  </tr>
+ </table>
 
 ## Simulation process and usage
 
@@ -65,8 +80,17 @@ MC2ospatnum500.pkl file, and you can plot it's result also in this file.
 
 You can toggle between simulation and plotting the results just with commenting out the appropriate section.
 
-
-
+ <table>
+  <tr>
+    <td valign="top"><img src="images/3Figure_4.png"></td>
+    <td valign="top"><img src="images/3Figure_1.png"></td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="images/3Figure_2.png"></td>
+    <td valign="top"><img src="images/3Figure_3.png"></td>
+  </tr>
+ </table>
+<!--
 ![img](images/3Figure_4.png?raw=True)![img](images/3Figure_1.png?raw=True)
-
 ![img](images/3Figure_2.png?raw=True)![img](images/3Figure_3.png?raw=True)
+-->
