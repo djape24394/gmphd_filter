@@ -1,10 +1,7 @@
-import tkinter
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy.linalg as lin
 import time
-import ospa
-import pickle
 
 
 def multivariate_gaussian(x: np.ndarray, m: np.ndarray, P: np.ndarray):
@@ -39,7 +36,7 @@ def clutter_intensity_function(z, lc, surveillance_region):
         return lc / ((surveillance_region[0][1] - surveillance_region[0][0]) * (
                 surveillance_region[1][1] - surveillance_region[1][0]))
     else:
-        return 0
+        return 0.0
 
 
 class GaussianMixture:
@@ -107,7 +104,7 @@ class GmphdFilter:
         "The Gaussian mixture probability hypothesis density filter" by Vo and Ma.
     """
 
-    def __init__(self, model, dtype=np.float64):
+    def __init__(self, model):
         """
         Note that state x will be np.ndarray. in our model, we assume linear transition and measurement in the
         following form
@@ -440,15 +437,15 @@ def process_model_for_example_2():
     # Parameters for the spawning model: beta(x|ksi) = sum(w[i]*Normal(x,F_spawn[i]*ksi+d_spawn[i],Q_spawn[i]))
     model['w_spawn'] = [0.05]
     model['F_spawn'] = [np.eye(4)]
-    model['d_spawn'] = [0]
+    model['d_spawn'] = [0.0]
     Q_spawn = np.eye(4) * 100
     Q_spawn[[2, 3], [2, 3]] = 400
-    model['Q_spawn'] = Q_spawn
+    model['Q_spawn'] = [Q_spawn]
 
     # Parameters of the new born targets Gaussian mixture
     w = [0.1, 0.1]
     m = [np.array([250., 250., 0., 0.]), np.array([-250., -250., 0., 0.])]
-    P = [np.diag([100., 100, 25, 25]), np.diag([100., 100, 25, 25])]
+    P = [np.diag([100., 100., 25., 25.]), np.diag([100., 100., 25., 25.])]
     model['birth_GM'] = GaussianMixture(w, m, P)
 
     # MEASUREMENT MODEL
@@ -472,10 +469,6 @@ def process_model_for_example_2():
     model['Jmax'] = 100
 
     return model
-
-
-def plot_results():
-    pass
 
 
 def extract_positions_of_targets(X_collection):
@@ -590,7 +583,7 @@ def generate_measurements(model, trajectories):
     return data
 
 
-def true_trajectory_tracks_plots(targets_birth_time, targets_death_time, targets_tracks, delta):
+def true_trajectory_tracks_plots(targets_birth_time, targets_tracks, delta):
     for_plot = {}
     for i, birth in enumerate(targets_birth_time):
         brojac = birth
@@ -648,7 +641,7 @@ if __name__ == '__main__':
     print('Filtration time: ' + str(time.time() - a) + ' sec')
 
     # Plotting the results of filtration saved in X_collection file
-    tracks_plot = true_trajectory_tracks_plots(targets_birth_time, targets_death_time, targets_tracks, model['T_s'])
+    tracks_plot = true_trajectory_tracks_plots(targets_birth_time, targets_tracks, model['T_s'])
     plt.figure()
     for key in tracks_plot:
         t, x, y = tracks_plot[key]
@@ -701,4 +694,4 @@ if __name__ == '__main__':
     plt.xlabel('time[$sec$]')
     plt.legend()
     plt.title('Estimated cardinality VS actual cardinality')
-    plt.show()
+    # plt.show()
