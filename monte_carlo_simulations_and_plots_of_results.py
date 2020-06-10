@@ -1,5 +1,6 @@
 from gmphd import *
-
+import pickle
+import ospa
 
 def MC_run():
     # parameters for OSPA metric
@@ -16,7 +17,7 @@ def MC_run():
     osp_loc_total = []
     osp_card_total = []
     tnum_total = []
-    for i in range(500):
+    for i in range(1000):
         a = time.time()
         data = generate_measurements(model, trajectories)
         gmphd = GmphdFilter(model)
@@ -38,7 +39,7 @@ def MC_run():
         tnum_total.append(tnum)
         print('Iteration ' + str(i) + ', total time: ' + str(time.time() - a))
 
-    with open('MC2ospatnum500.pkl', 'wb') as output:
+    with open('MC2ospatnum1000.pkl', 'wb') as output:
         pickle.dump((osp_all_total, osp_loc_total, osp_card_total, tnum_total), output)
 
     ospall = np.array(osp_all_total)
@@ -75,7 +76,7 @@ if __name__ == '__main__':
     # If you want to plot results of MC_run() function that are saved in file,
     # uncomment the following section
     # ====================Monte Carlo Plot results===================================
-    with open('MC2ospatnum500.pkl', 'rb') as f:
+    with open('MC2ospatnum1000.pkl', 'rb') as f:
         # The protocol version used is detected automatically, so we do not
         # have to specify it.
         (osp_all_total, osp_loc_total, osp_card_total, tnum_total) = pickle.load(f)

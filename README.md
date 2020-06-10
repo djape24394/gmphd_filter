@@ -75,8 +75,8 @@ of multi-object filters", by D. Schuhmacher, B.-T. Vo, and B.-N. Vo.
 
 in [monte_carlo_simulations_and_plots_of_results.py](monte_carlo_simulations_and_plots_of_results.py) you can run 
 Monte Corle simulations, which is implemented in `MC_run()` function. These simulations can last quite long, and that is
-why the result is saved in .pkl file. I have provided one such file with averaged 500 MC simulations in
-MC2ospatnum500.pkl file, and you can plot it's result also in this file.
+why the result is saved in .pkl file. I have provided one such file with averaged 1000 MC simulations in
+MC2ospatnum1000.pkl file, and you can plot it's result also in this file.
 
 You can toggle between simulation and plotting the results just with commenting out the appropriate section.
 

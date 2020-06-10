@@ -3,7 +3,6 @@ import numpy as np
 import numpy.linalg as lin
 
 
-
 def _calculation(X, Y, c, p):
     def d_c(x, y, c):
         return min(c, lin.norm(x - y))
@@ -19,7 +18,6 @@ def _calculation(X, Y, c, p):
         m, n = n, m
 
     card_dist = c ** p * (n - m)
-    local_dist = None
 
     D = np.zeros((n, n))
     for i in range(m):
