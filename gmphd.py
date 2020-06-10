@@ -617,30 +617,30 @@ if __name__ == '__main__':
 
     # For example 1, uncomment the following code.
     # =================================================Example 1========================================================
-    # model = process_model_for_example_1()
-    # targets_birth_time, targets_death_time, targets_start = example1(model['num_scans'])
-    # trajectories, targets_tracks = generate_trajectories(model, targets_birth_time, targets_death_time, targets_start,
-    #                                                      noise=False)
+    model = process_model_for_example_1()
+    targets_birth_time, targets_death_time, targets_start = example1(model['num_scans'])
+    trajectories, targets_tracks = generate_trajectories(model, targets_birth_time, targets_death_time, targets_start,
+                                                         noise=False)
     # ==================================================================================================================
 
     # For example 2, uncomment the following code.
     # =================================================Example 2========================================================
-    model = process_model_for_example_2()
-    targets_birth_time, targets_death_time, targets_start, targets_spw_time_brttgt_vel = example2(model['num_scans'])
-    trajectories, targets_tracks = generate_trajectories(model, targets_birth_time, targets_death_time, targets_start,
-                                                         targets_spw_time_brttgt_vel, noise=False)
+    # model = process_model_for_example_2()
+    # targets_birth_time, targets_death_time, targets_start, targets_spw_time_brttgt_vel = example2(model['num_scans'])
+    # trajectories, targets_tracks = generate_trajectories(model, targets_birth_time, targets_death_time, targets_start,
+    #                                                      targets_spw_time_brttgt_vel, noise=False)
     # ==================================================================================================================
 
     # Collections of observations for each time step
     data = generate_measurements(model, trajectories)
 
-    # Call of the gmphd filter on the created observations collections
+    # Call of the gmphd filter for the created observations collections
     gmphd = GmphdFilter(model)
     a = time.time()
     X_collection = gmphd.filter_data(data)
     print('Filtration time: ' + str(time.time() - a) + ' sec')
 
-    # Plotting the results of filtration saved in X_collection file
+    # Plot the results of filtration saved in X_collection file
     tracks_plot = true_trajectory_tracks_plots(targets_birth_time, targets_tracks, model['T_s'])
     plt.figure()
     for key in tracks_plot:
@@ -652,10 +652,10 @@ if __name__ == '__main__':
     plt.gca().set_aspect('equal', adjustable='box')
     plt.xlabel('x')
     plt.ylabel('y')
-    # plt.title(r"Targets movement in surveilance region. Circle represents the starting point and"
-    #           r" square represents the end point.",loc='center', wrap=True)
+    plt.title(r"Targets movement in surveilance region. Circle represents the starting point and"
+              r" square represents the end point.", loc='center', wrap=True)
 
-    # plot measurements, true trajectories and estimations
+    # Plot measurements, true trajectories and estimations
     meas_time, meas_x, meas_y = extract_axis_for_plot(data, model['T_s'])
     estim_time, estim_x, estim_y = extract_axis_for_plot(X_collection, model['T_s'])
     plt.figure()
@@ -666,8 +666,9 @@ if __name__ == '__main__':
     plt.plot(estim_time, estim_x, 'o', c='k', markersize=3)
     plt.xlabel('time[$sec$]')
     plt.ylabel('x')
+    plt.title('X axis in time. Blue x are measurements(50 in each time step), '
+              'black dots are estimations and the red lines are actual trajectories of targets', loc='center', wrap=True)
 
-    # plot measurements, true trajectories and estimations
     plt.figure()
     plt.plot(meas_time, meas_y, 'x', c='C0')
     for key in tracks_plot:
@@ -676,6 +677,8 @@ if __name__ == '__main__':
     plt.plot(estim_time, estim_y, 'o', c='k', markersize=3)
     plt.xlabel('time[$sec$]')
     plt.ylabel('y')
+    plt.title('Y axis in time. Blue x are measurements(50 in each time step), '
+              'black dots are estimations and the red lines are actual trajectories of targets', loc='center', wrap=True)
 
     num_targets_truth = []
     num_targets_estimated = []
@@ -693,5 +696,5 @@ if __name__ == '__main__':
     plt.step(num_targets_truth, 'r', label='actual number of targets')
     plt.xlabel('time[$sec$]')
     plt.legend()
-    plt.title('Estimated cardinality VS actual cardinality')
-    # plt.show()
+    plt.title('Estimated cardinality VS actual cardinality', loc='center', wrap=True)
+    plt.show()

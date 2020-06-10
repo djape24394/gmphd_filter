@@ -94,19 +94,19 @@ if __name__ == '__main__':
         plt.figure()
         plt.plot(ospAllMean)
         plt.xlabel('Time step')
-        plt.ylabel('OSPA Dist')
+        plt.ylabel('OSPA Distance')
         plt.grid(True)
 
         plt.figure()
         plt.plot(ospLocMean)
         plt.xlabel('Time step')
-        plt.ylabel('OSPA Loc')
+        plt.ylabel('OSPA Localization')
         plt.grid(True)
 
         plt.figure()
         plt.plot(ospCarMean)
         plt.xlabel('Time step')
-        plt.ylabel('OSPA Card')
+        plt.ylabel('OSPA Cardinality')
         plt.grid(True)
 
         plt.figure()
@@ -116,5 +116,6 @@ if __name__ == '__main__':
         plt.xlabel('Time step')
         plt.ylabel('Avg. numb. of targets')
         plt.grid(True)
+        plt.title('Average number of targets with standard deviation')
         plt.show()
     # ===============================================================================
