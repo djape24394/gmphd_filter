@@ -2,10 +2,10 @@
 **It's based on "The Gaussian mixture probability hypothesis density filter" by Vo and Ma. Also, OSPA metric is provided for 
 performance evaulation.**
 
-The [gmphd.py](gmphd.py) contains two simulation examples. 
+The file [examples.py](examples.py) contains two simulation examples. 
 
 ### Example 1
-The first is actually replica of the example in "Bayesian Multiple 
+The first is actually a replica of the example in "Bayesian Multiple 
 Target Filtering Using Random Finite Sets" by Vo, Vo, Clark used for performance evaulation of GMPHD filter. Targets lifes
  are based on Matlab code provided by Vo in http://ba-tuong.vo-au.com/codes.html and example doesn't contain target spawning.
 
@@ -21,7 +21,7 @@ Target Filtering Using Random Finite Sets" by Vo, Vo, Clark used for performance
  </table>
  
 ### Example 2
-The second example is based on simulation example in "The Gaussian mixture probability hypothesis density filter" by Vo and Ma. Also, 
+The second example is based on the simulation example in "The Gaussian mixture probability hypothesis density filter" by Vo and Ma. Also, 
 this example demonstrates the spawning situation.
 
  <table>
@@ -37,27 +37,27 @@ this example demonstrates the spawning situation.
 
 ## Simulation process and usage
 
-The simulation process steps are the following:
+The simulation steps are the following:
 * Define the details of the process model:
 ```python
     model = process_model_for_example_1()
 ```
-* Create the description objects of the targets birth moment, death moment and starting points. Then generate 
+* Create the objects for description of the targets birth timestamps, death timestamps and starting positions. Then generate 
   trajectories based on the model and the given targets life description:
 ```python
     targets_birth_time, targets_death_time, targets_start = example1(model['num_scans'])
     trajectories, targets_tracks = generate_trajectories(model, targets_birth_time, targets_death_time, targets_start,
                                                          noise=False)
 ```
-In the provided two simulation examples, targets are moving with constant velocity, we can make them move randomly in the
+In the provided two simulation examples, targets are moving with the constant velocity, but we can make them move randomly in the
 observation area by setting the `noise` parameter true.
-* Generate measurements based on the target trajectories. Because in real situations sensor observations are noisy, in
+* Generate measurements based on the target trajectories. Because in real situations the sensor observations are noisy, in
   this step we just add the measurement noise for simulation purposes:
 ```python
     data = generate_measurements(model, trajectories)
 ```
 
-The `data` is list of collections of observations in each time step. For real filtering process, this fill be the 
+The `data` is list of collections of observations in each time step. For real filtering process, this will be the 
 input from our sensors.
 *  Filter the measurement data with GMPHD filter. Filter also needs to know assumed process model, which is provided by
    creation of the filter object.
@@ -66,7 +66,7 @@ input from our sensors.
     X_collection = gmphd.filter_data(data)
 ```
 ###
-All about the creation of the simulation process and running examples is in gmphd.py file. To switch between the two
+All about the creation of the simulation process and running examples is in [examples.py](examples.py) file. To switch between the two
 examples, just toggle comments at the beggining of the main function. 
 
 ## Monte Carlo simulations

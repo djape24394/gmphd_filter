@@ -1,4 +1,5 @@
 from gmphd import *
+from examples import *
 import pickle
 import ospa
 
