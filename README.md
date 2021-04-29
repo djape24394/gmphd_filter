@@ -1,12 +1,14 @@
 # The Gaussian Mixture Probability Hypothesis Density filter. Python implementation
-**It's based on "The Gaussian mixture probability hypothesis density filter" by Vo and Ma. Also, OSPA metric is provided for 
-performance evaulation.**
+**It's based on ["The Gaussian mixture probability hypothesis density filter" by Vo and Ma](https://ieeexplore.ieee.org/document/1710358). For 
+performance evaulation, OSPA metric is provided.**
+
+For the ones who want to have better understanding of the algorithm, I highly recommend the paper ["Derivation of the PHD and CPHD Filters Based on Direct Kullback–Leibler Divergence Minimization" by García-Fernández and Vo](https://ieeexplore.ieee.org/document/7202905).
 
 The file [examples.py](examples.py) contains two simulation examples. 
 
 ### Example 1
-The first is actually a replica of the example in "Bayesian Multiple 
-Target Filtering Using Random Finite Sets" by Vo, Vo, Clark used for performance evaulation of GMPHD filter. Targets lifes
+The first is actually a replica of the example in ["Bayesian Multiple 
+Target Filtering Using Random Finite Sets" by Vo, Vo, Clark](https://researchportal.hw.ac.uk/en/publications/bayesian-multiple-target-filtering-using-random-finite-sets) used for performance evaulation of GMPHD filter. Targets lifes
  are based on Matlab code provided by Vo in http://ba-tuong.vo-au.com/codes.html and example doesn't contain target spawning.
 
  <table>
@@ -21,7 +23,7 @@ Target Filtering Using Random Finite Sets" by Vo, Vo, Clark used for performance
  </table>
  
 ### Example 2
-The second example is based on the simulation example in "The Gaussian mixture probability hypothesis density filter" by Vo and Ma. Also, 
+The second example is based on the simulation example in ["The Gaussian mixture probability hypothesis density filter" by Vo and Ma](https://ieeexplore.ieee.org/document/1710358). Also, 
 this example demonstrates the spawning situation.
 
  <table>

@@ -1,35 +1,47 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import numpy.linalg as lin
-import time
+from typing import List, Dict, Any
 
 
-def multivariate_gaussian(x: np.ndarray, m: np.ndarray, P: np.ndarray):
+def multivariate_gaussian(x: np.ndarray, m: np.ndarray, P: np.ndarray) -> float:
     """
-        Multivatiate Gaussian Distribution
+    Multivatiate Gaussian Distribution
+
+    :param x: vector
+    :param m: distribution mean vector
+    :param P: Covariance matrix
+    :return: probability density function at x
     """
     first_part = 1 / (((2 * np.pi) ** (x.size / 2.0)) * (lin.det(P) ** 0.5))
     second_part = -0.5 * (x - m) @ lin.inv(P) @ (x - m)
     return first_part * np.exp(second_part)
 
 
-def multivariate_gaussian_with_det_and_inv(x: np.ndarray, m: np.ndarray, detP, invP: np.ndarray):
+def multivariate_gaussian_predefined_det_and_inv(x: np.ndarray, m: np.ndarray, detP: np.float64,
+                                                 invP: np.ndarray) -> float:
     """
-        Multivariate Gaussian Distribution with provided determinant and inverse of Gaussian mixture
+    Multivariate Gaussian Distribution with provided determinant and inverse of the Gaussian mixture.
+    Useful in case when we already have precalculted determinant and inverse of the covariance matrix.
+    :param x: vector
+    :param m: distribution mean
+    :param detP: determinant of the covariance matrix
+    :param invP: inverse of the covariance matrix
+    :return: probability density function at x
     """
     first_part = 1 / (((2 * np.pi) ** (x.size / 2.0)) * (detP ** 0.5))
     second_part = -0.5 * (x - m) @ invP @ (x - m)
     return first_part * np.exp(second_part)
 
 
-def clutter_intensity_function(z, lc, surveillance_region):
-    '''
-    Clutter intensity function, with uniform distribution through the surveillance region, pg. 8
+def clutter_intensity_function(z: np.ndarray, lc: int, surveillance_region: np.ndarray):
+    """
+    Clutter intensity function, with the uniform distribution through the surveillance region, pg. 8
     in "Bayesian Multiple Target Filtering Using Random Finite Sets" by Vo, Vo, Clark.
     :param z:
     :param lc: average number of false detections per time step
-    :param surveillance_region: np.ndarray of shape (number_dimensions, 2) giving range(min and max) for each dimension
-    '''
+    :param surveillance_region: np.ndarray of shape (number_dimensions, 2) giving the range(min and max) for each
+                                dimension
+    """
     if surveillance_region[0][0] <= z[0] <= surveillance_region[0][1] and surveillance_region[1][0] <= z[1] <= \
             surveillance_region[1][1]:
         # example in two dimensions: lc/((xmax - xmin)*(ymax-ymin))
@@ -40,16 +52,17 @@ def clutter_intensity_function(z, lc, surveillance_region):
 
 
 class GaussianMixture:
-    def __init__(self, w, m, P):
+    def __init__(self, w: List[np.float64], m: List[np.ndarray], P: List[np.ndarray]):
         """
         The Gaussian mixture class
-        inputs:
-        - w: list of scalar weights
-        - m: list of np.ndarray means
-        - m: list of np.ndarray covariance matrices
 
-        Note that constructor creates detP and invP variables which can be used instead of P list for covariance matrix
-        determinant and inverse. These lists could be initialized with assign_determinant_and_inverse function
+        :param w: list of scalar weights
+        :param m: list of np.ndarray means
+        :param P: list of np.ndarray covariance matrices
+
+        Note that constructor creates detP and invP variables which can be used instead of P list, for covariance matrix
+        determinant and inverse. These lists cen be initialized with assign_determinant_and_inverse function, and
+        it is useful in case we already have precalculated determinant and inverse earlier.
         """
         self.w = w
         self.m = m
@@ -57,34 +70,56 @@ class GaussianMixture:
         self.detP = None
         self.invP = None
 
-    def assign_determinant_and_inverse(self, detP, invP):
+    def set_covariance_determinant_and_inverse_list(self, detP: List[np.float64], invP: List[np.ndarray]):
+        """
+        For each Gaussian component, provide the determinant and the covariance inverse
+        :param detP: list of determinants for each Gaussian component in the mixture
+        :param invP: list of covariance inverses for each Gaussian component in the mixture
+        """
         self.detP = detP
         self.invP = invP
 
     def mixture_value(self, x: np.ndarray):
+        """
+        Gaussian Mixture function for the given vector x
+        """
         sum = 0
         if self.detP is None:
             for i in range(len(self.w)):
                 sum += self.w[i] * multivariate_gaussian(x, self.m[i], self.P[i])
         else:
             for i in range(len(self.w)):
-                sum += self.w[i] * multivariate_gaussian_with_det_and_inv(x, self.m[i], self.detP[i], self.invP[i])
+                sum += self.w[i] * multivariate_gaussian_predefined_det_and_inv(x, self.m[i], self.detP[i],
+                                                                                self.invP[i])
         return sum
 
-    def mixture_component_value_at(self, x: np.ndarray, i: int):
+    def mixture_single_component_value(self, x: np.ndarray, i: int) -> float:
+        """
+        Single Gaussian Mixture component value for the given vector
+        :param x: vector
+        :param i: index of the component
+        :returns: probability density function at x, multiplied with the component weght at the index i
+        """
         if self.detP is None:
             return self.w[i] * multivariate_gaussian(x, self.m[i], self.P[i])
         else:
-            return self.w[i] * multivariate_gaussian_with_det_and_inv(x, self.m[i], self.detP[i], self.invP[i])
+            return self.w[i] * multivariate_gaussian_predefined_det_and_inv(x, self.m[i], self.detP[i], self.invP[i])
 
-    def mixture_component_values_list(self, x):
+    def mixture_component_values_list(self, x: np.ndarray) -> List[float]:
+        """
+        Sometimes it is useful to have value of each component multiplied with its weight
+        :param x: vector
+        :return: List[np.float64]:
+        List of components values at x, multiplied with their weight.
+        """
         val = []
         if self.detP is None:
             for i in range(len(self.w)):
                 val.append(self.w[i] * multivariate_gaussian(x, self.m[i], self.P[i]))
         else:
             for i in range(len(self.w)):
-                val.append(self.w[i] * multivariate_gaussian_with_det_and_inv(x, self.m[i], self.detP[i], self.invP[i]))
+                val.append(
+                    self.w[i] * multivariate_gaussian_predefined_det_and_inv(x, self.m[i], self.detP[i], self.invP[i]))
         return val
 
     def copy(self):
@@ -98,35 +133,78 @@ class GaussianMixture:
         return GaussianMixture(w, m, P)
 
 
-class GmphdFilter:
-    """
-        The Gaussian Mixture Probability Hypothesis Density filter implementation. It's based on
-        "The Gaussian mixture probability hypothesis density filter" by Vo and Ma.
-    """
+def get_matrices_inverses(P_list: List[np.ndarray]) -> List[np.ndarray]:
+    inverse_P_list = []
+    for P in P_list:
+        inverse_P_list.append(lin.inv(P))
+    return inverse_P_list
 
-    def __init__(self, model):
+
+def get_matrices_determinants(P_list: List[np.ndarray]) -> List[float]:
+    """
+    :param P_list: list of covariance matrices
+    :return:
+    """
+    detP = []
+    for P in P_list:
+        detP.append(lin.det(P))
+    return detP
+
+
+def thinning_and_displacement(v: GaussianMixture, p, F: np.ndarray, Q: np.ndarray):
+    """
+    For the given Gaussian mixture v, perform thinning with probability P and displacement with N(x; F @ x_prev, Q)
+    See https://ieeexplore.ieee.org/document/7202905 for details
+    """
+    w = []
+    m = []
+    P = []
+    for weight in v.w:
+        w.append(weight * p)
+    for mean in v.m:
+        m.append(F @ mean)
+    for cov_matrix in v.P:
+        P.append(Q + F @ cov_matrix @ F.T)
+    return GaussianMixture(w, m, P)
+
+
+class GmphdFilter:
+    def __init__(self, model: Dict[str, Any]):
         """
-        Note that state x will be np.ndarray. in our model, we assume linear transition and measurement in the
+        The Gaussian Mixture Probability Hypothesis Density filter implementation.
+        "The Gaussian mixture probability hypothesis density filter" by Vo and Ma.
+
+        https://ieeexplore.ieee.org/document/1710358
+
+        We assume linear transition and measurement model in the
         following form
             x[k] = Fx[k-1] + w[k-1]
             z[k] = Hx[k] + v[k]
         Inputs:
+
         - model: dictionary which contains the following elements(keys are strings):
+
                F: state transition matrix
+
                H: measurement matrix
+
                Q: process noise covariance matrix(of variable w[k]).
+
                R: measurement noise covariance matrix(of variable v[k]).
+
              p_d: probability of target detection
+
              p_s: probability of target survival
 
-         Spawning model, see paper pg. 5. it's a gaussian mixture conditioned on state
-         F_spawn:  d_spawn: Q_spawn: w_spawn: lists of ndarray objects with the same length, see pg. 5
+            Spawning model, see pg. 5. of the paper. It's a Gaussian Mixture conditioned on state
 
-    clutt_int_fun: reference to clutter intensity function, gets only one argument, which is the current measure
+             F_spawn:  d_spawn: Q_spawn: w_spawn: lists of ndarray objects with the same length, see pg. 5
+
+            clutt_int_fun: reference to clutter intensity function, gets only one argument, which is the current measure
 
                T: U: Jmax: Pruning parameters, see pg. 7.
 
-        birth_GM: The Gaussian Mixture of the birth intensity
+            birth_GM: The Gaussian Mixture of the birth intensity
         """
         # to do: dtype, copy, improve performance
         self.p_s = model['p_s']
@@ -145,22 +223,7 @@ class GmphdFilter:
         self.U = model['U']
         self.Jmax = model['Jmax']
 
-    def thinning_and_displacement(self, v: GaussianMixture, p, F: np.ndarray, Q: np.ndarray):
-        """
-        For the given Gaussian mixture v, perform thinning with probability P and displacement with N(x; F @ x_prev, Q)
-        """
-        w = []
-        m = []
-        P = []
-        for weight in v.w:
-            w.append(weight * p)
-        for mean in v.m:
-            m.append(F @ mean)
-        for cov_matrix in v.P:
-            P.append(Q + F @ cov_matrix @ F.T)
-        return GaussianMixture(w, m, P)
-
-    def spawn_mixture(self, v):
+    def spawn_mixture(self, v: GaussianMixture) -> GaussianMixture:
         """
         Spawning targets in prediction step
         """
@@ -174,19 +237,7 @@ class GmphdFilter:
                 P.append(self.Q_spawn[j] + self.F_spawn[j] @ v.P[i] @ self.F_spawn[j].T)
         return GaussianMixture(w, m, P)
 
-    def get_list_of_determinants(self, P_list):
-        detP = []
-        for P in P_list:
-            detP.append(lin.det(P))
-        return detP
-
-    def get_list_of_inverses(self, P_list):
-        invP = []
-        for P in P_list:
-            invP.append(lin.inv(P))
-        return invP
-
-    def prediction(self, v):
+    def prediction(self, v: GaussianMixture) -> GaussianMixture:
         """
         Prediction step of the GMPHD filter
         Inputs:
@@ -195,24 +246,24 @@ class GmphdFilter:
         # v_pred = v_s + v_spawn +  v_new_born
         birth_copy = self.birth_GM.copy()
         # targets that survived v_s:
-        v_s = self.thinning_and_displacement(v, self.p_s, self.F, self.Q)
+        v_s = thinning_and_displacement(v, self.p_s, self.F, self.Q)
         # spawning targets
         v_spawn = self.spawn_mixture(v)
         # final phd of prediction
         return GaussianMixture(v_s.w + v_spawn.w + birth_copy.w, v_s.m + v_spawn.m + birth_copy.m,
                                v_s.P + v_spawn.P + birth_copy.P)
 
-    def correction(self, v: GaussianMixture, Z):
+    def correction(self, v: GaussianMixture, Z: List[np.ndarray]) -> GaussianMixture:
         """
         Correction step of the GMPHD filter
         Inputs:
-        - v: Gaussian mixture obtained from the prediction step implemented in prediction function
-        - Z: Measurement set, containing list of observations
+        - v: Gaussian mixture obtained from the prediction step
+        - Z: Measurement set, containing set of observations
         """
-        v_residual = self.thinning_and_displacement(v, self.p_d, self.H, self.R)
-        detP = self.get_list_of_determinants(v_residual.P)
-        invP = self.get_list_of_inverses(v_residual.P)
-        v_residual.assign_determinant_and_inverse(detP, invP)
+        v_residual = thinning_and_displacement(v, self.p_d, self.H, self.R)
+        detP = get_matrices_determinants(v_residual.P)
+        invP = get_matrices_inverses(v_residual.P)
+        v_residual.set_covariance_determinant_and_inverse_list(detP, invP)
 
         K = []
         P_kk = []
@@ -236,14 +287,17 @@ class GmphdFilter:
 
         return GaussianMixture(w, m, P)
 
-    def pruning(self, v: GaussianMixture):
+    def pruning(self, v: GaussianMixture) -> GaussianMixture:
+        """
+        See https://ieeexplore.ieee.org/document/7202905 for details
+        """
         I = (np.array(v.w) > self.T).nonzero()[0]
         w = [v.w[i] for i in I]
         m = [v.m[i] for i in I]
         P = [v.P[i] for i in I]
         v = GaussianMixture(w, m, P)
         I = (np.array(v.w) > self.T).nonzero()[0].tolist()
-        invP = self.get_list_of_inverses(v.P)
+        invP = get_matrices_inverses(v.P)
         vw = np.array(v.w)
         vm = np.array(v.m)
         w = []
@@ -277,7 +331,7 @@ class GmphdFilter:
 
         return GaussianMixture(w, m, P)
 
-    def state_estimation(self, v: GaussianMixture):
+    def state_estimation(self, v: GaussianMixture) -> List[np.ndarray]:
         X = []
         for i in range(len(v.w)):
             if v.w[i] >= 0.5:
@@ -285,12 +339,14 @@ class GmphdFilter:
                     X.append(v.m[i])
         return X
 
-    def filter_data(self, Z):
+    def filter_data(self, Z: List[List[np.ndarray]]) -> List[List[np.ndarray]]:
         """
-        Input:
-        -Z: list of lists of np.ndarray representing the observations for each time step
-        Output:
-        -X: list of lists of np.ndarray representing the estimations for each time step
+        Given the list of collections of measurements for each time step, perform filtering and return the
+        estimated sets of tracks for each step.
+
+        :param Z: list of observations(measurements) for each time step
+        :return X:
+        list of estimated track sets for each time step
         """
         X = []
         v = GaussianMixture([], [], [])
@@ -301,4 +357,3 @@ class GmphdFilter:
             x = self.state_estimation(v)
             X.append(x)
         return X
-        

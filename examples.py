@@ -1,4 +1,7 @@
+import matplotlib.pyplot as plt
+import time
 from gmphd import *
+
 
 def process_model_for_example_1():
     # This is the model for the example in "Bayesian Multiple Target Filtering Using Random Finite Sets" by Vo, Vo, Clark
@@ -364,7 +367,8 @@ if __name__ == '__main__':
     plt.xlabel('time[$sec$]')
     plt.ylabel('x')
     plt.title('X axis in time. Blue x are measurements(50 in each time step), '
-              'black dots are estimations and the red lines are actual trajectories of targets', loc='center', wrap=True)
+              'black dots are estimations and the red lines are actual trajectories of targets', loc='center',
+              wrap=True)
 
     plt.figure()
     plt.plot(meas_time, meas_y, 'x', c='C0')
@@ -375,7 +379,8 @@ if __name__ == '__main__':
     plt.xlabel('time[$sec$]')
     plt.ylabel('y')
     plt.title('Y axis in time. Blue x are measurements(50 in each time step), '
-              'black dots are estimations and the red lines are actual trajectories of targets', loc='center', wrap=True)
+              'black dots are estimations and the red lines are actual trajectories of targets', loc='center',
+              wrap=True)
 
     num_targets_truth = []
     num_targets_estimated = []
